@@ -43,10 +43,6 @@
 #endif
 #endif
 
-
-
-
-
 ////////////////////////////////////////////////////////////////////////////////
 #pragma mark - Utility (for little endian platform)
 
@@ -641,7 +637,7 @@ static inline CGFloat YYImageDegreesToRadians(CGFloat degrees) {
     return degrees * M_PI / 180;
 }
 
-CGColorSpaceRef YYCGColorSpaceGetDeviceRGB() {
+CGColorSpaceRef YYCGColorSpaceGetDeviceRGB(void) {
     static CGColorSpaceRef space;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -650,7 +646,7 @@ CGColorSpaceRef YYCGColorSpaceGetDeviceRGB() {
     return space;
 }
 
-CGColorSpaceRef YYCGColorSpaceGetDeviceGray() {
+CGColorSpaceRef YYCGColorSpaceGetDeviceGray(void) {
     static CGColorSpaceRef space;
     static dispatch_once_t onceToken;
     dispatch_once(&onceToken, ^{
@@ -1136,6 +1132,25 @@ YYImageType YYImageDetectType(CFDataRef data) {
     // JP2
     if (memcmp(bytes + 4, "\152\120\040\040\015", 5) == 0) return YYImageTypeJPEG2000;
     
+    // HEIC
+    uint8_t magic1 = *((uint8_t *)bytes);
+    if (magic1 == 0x00) {
+        NSData *data = [NSData dataWithBytes:bytes length:length];
+        NSString *testString = [[NSString alloc] initWithData:[data subdataWithRange:NSMakeRange(4, 8)]
+                                                     encoding:NSASCIIStringEncoding];
+        if ([testString isEqualToString:@"ftypheic"]
+            || [testString isEqualToString:@"ftypheix"]
+            || [testString isEqualToString:@"ftyphevc"]
+            || [testString isEqualToString:@"ftyphevx"]) {
+            return YYImageTypeHEIC;
+        }
+        
+        //....ftypmif1 ....ftypmsf1
+        if ([testString isEqualToString:@"ftypmif1"] || [testString isEqualToString:@"ftypmsf1"]) {
+            return YYImageTypeHEIF;
+        }
+    }
+    
     return YYImageTypeUnknown;
 }
 
@@ -1182,6 +1197,8 @@ NSString *YYImageTypeGetExtension(YYImageType type) {
         case YYImageTypeGIF: return @"gif";
         case YYImageTypePNG: return @"png";
         case YYImageTypeWebP: return @"webp";
+        case YYImageTypeHEIC: return @"heic";
+        case YYImageTypeHEIF: return @"heif";
         default: return nil;
     }
 }
@@ -1230,7 +1247,7 @@ CFDataRef YYCGImageCreateEncodedData(CGImageRef imageRef, YYImageType type, CGFl
 
 #if YYIMAGE_WEBP_ENABLED
 
-BOOL YYImageWebPAvailable() {
+BOOL YYImageWebPAvailable(void) {
     return YES;
 }
 
@@ -1437,7 +1454,7 @@ fail:
 
 #else
 
-BOOL YYImageWebPAvailable() {
+BOOL YYImageWebPAvailable(void) {
     return NO;
 }
 
